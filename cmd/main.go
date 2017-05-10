@@ -1,15 +1,20 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"os"
+	"os/exec"
+	"strconv"
+	"strings"
 
 	"gopkg.in/yaml.v2"
 )
 
-type nodes struct {
-	Nodes   []node
+type config struct {
+	Nodes   []*node
 	Clarify clarify
 }
 
@@ -27,20 +32,123 @@ type clarify struct {
 	User    string
 }
 
+type args struct {
+	Args []string
+}
+
 func main() {
 	cfg := flag.String("cfg", "nodes.yaml", "Nodes configuration to read")
 	flag.Parse()
 
-	n := &nodes{}
-	data, err := ioutil.ReadFile(*cfg)
+	config, err := parse(cfg)
 	if err != nil {
-		fmt.Printf("Unable to read %s file.", *cfg)
+		fmt.Println(err)
+		os.Exit(1)
 	}
-	if err := yaml.Unmarshal([]byte(data), &n); err != nil {
+
+	node, err := config.findLocalNode()
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	peers, _ := config.peers()
+
+	args := &args{}
+	args.user(config.Clarify.User)
+	args.toolsInstall(node.Tools)
+	args.clarifyInstall(config.Clarify.Install)
+	args.clarifyShare(config.Clarify.Share)
+	args.netInterface(node.NetInterface)
+	args.address(node.Address)
+	args.nomad(node.NomadPort)
+	args.hosts(peers)
+
+	cmd := &exec.Cmd{
+		Dir:  config.Clarify.Install,
+		Path: "jre/bin/java",
+		Args: args.Args,
+	}
+
+	if err := cmd.Run(); err != nil {
 		fmt.Println(err)
 	}
-	for _, node := range n.Nodes {
-		fmt.Println(node)
+}
+
+func parse(filename *string) (*config, error) {
+	c := &config{}
+	data, err := ioutil.ReadFile(*filename)
+	if err != nil {
+		return c, fmt.Errorf("unable to read %s", *filename)
 	}
-	fmt.Println(n.Clarify)
+	if err := yaml.Unmarshal([]byte(data), &c); err != nil {
+		return c, err
+	}
+	return c, nil
+}
+
+func (n *config) findLocalNode() (*node, error) {
+	for _, n := range n.Nodes {
+		if hostname, err := os.Hostname(); err != nil {
+			return &node{}, err
+		} else if n.Hostname == hostname {
+			return n, nil
+		}
+	}
+	return &node{}, errors.New("node not found")
+}
+
+func (n *config) peers() (string, error) {
+	var peers = make([]string, 0)
+	for _, n := range n.Nodes {
+		if hostname, err := os.Hostname(); err != nil {
+			return "", err
+		} else if n.Hostname != hostname {
+			peers = append(peers, n.Address)
+		}
+	}
+	return strings.Join(peers, " "), nil
+}
+
+func (a *args) user(user string) {
+	a.Args = append(a.Args, "-user")
+	a.Args = append(a.Args, user)
+}
+
+func (a *args) toolsInstall(dir string) {
+	a.Args = append(a.Args, "-install")
+	a.Args = append(a.Args, dir)
+}
+
+func (a *args) clarifyInstall(dir string) {
+	a.Args = append(a.Args, "-clarify")
+	a.Args = append(a.Args, dir)
+}
+
+func (a *args) clarifyShare(dir string) {
+	a.Args = append(a.Args, "-share")
+	a.Args = append(a.Args, dir)
+}
+
+func (a *args) netInterface(net string) {
+	a.Args = append(a.Args, "-net")
+	a.Args = append(a.Args, net)
+}
+
+func (a *args) address(address string) {
+	if len(address) == 0 {
+		return
+	}
+	a.Args = append(a.Args, "-address")
+	a.Args = append(a.Args, address)
+}
+
+func (a *args) nomad(port int) {
+	portStr := strconv.Itoa(port)
+	a.Args = append(a.Args, "-nomad_port")
+	a.Args = append(a.Args, portStr)
+}
+
+func (a *args) hosts(peers string) {
+	a.Args = append(a.Args, "-hosts")
+	a.Args = append(a.Args, peers)
 }

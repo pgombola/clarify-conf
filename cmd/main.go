@@ -14,22 +14,22 @@ import (
 )
 
 type config struct {
-	Nodes   []*node
-	Clarify *clarify
+	Nodes   []*node  `yaml:"clarify-nodes"`
+	Clarify *clarify `yaml:"clarify-common"`
 }
 
 type node struct {
 	Hostname     string
 	NetInterface string
 	Address      string
-	NomadPort    int
 	Tools        string
 }
 
 type clarify struct {
-	Install string
-	Share   string
-	User    string
+	Install   string
+	Share     string
+	User      string
+	NomadPort int
 }
 
 type args struct {
@@ -52,8 +52,6 @@ func main() {
 		os.Exit(1)
 	}
 	peers, _ := config.peers()
-
-	fmt.Println(newArgs(config.Clarify, node, peers).Args)
 
 	cmd := &exec.Cmd{
 		Dir:  config.Clarify.Install,
@@ -109,7 +107,7 @@ func newArgs(c *clarify, n *node, peers string) *args {
 	args.clarifyShare(c.Share)
 	args.netInterface(n.NetInterface)
 	args.address(n.Address)
-	args.nomad(n.NomadPort)
+	args.nomad(c.NomadPort)
 	args.hosts(peers)
 	return args
 }

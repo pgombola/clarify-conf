@@ -126,10 +126,13 @@ func newArgs(c *clarify, n *node, peers string) (*args, error) {
 }
 
 func findInstallerJar(install string) (string, error) {
+	if _, err := os.Stat(install); os.IsNotExist(err) {
+		return "", errors.New("invalid install dir")
+	}
 	var jar string
 	err := filepath.Walk(path.Join(install, "tools", "lib"),
 		func(filepath string, info os.FileInfo, err error) error {
-			matched, err := path.Match("clarify-server-installer-*", info.Name())
+			matched, err := path.Match("clarify-service-installer-*", info.Name())
 			if err != nil {
 				return err
 			}

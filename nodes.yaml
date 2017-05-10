@@ -1,20 +1,17 @@
-nodes:
-  - hostname: server-1
+clarify-nodes:
+  - hostname: pgombola-mbp.local
     netinterface: en01
     address: 10.10.20.31
-    nomadport: 4646
     tools: /home/clarify/clarify-tools
-  - hostname: server-2
+  - hostname: pgombola-mbp.extol.com
     netinterface: en01
-    address: 10.10.20.32
-    nomadport: 4646
     tools: /home/clarify/clarify-tools
   - hostname: server-3
     netinterface: en01
-    address: 10.10.30.33
-    nomadport: 4646
+    address: 10.10.30.33   
     tools: /home/clarify/clarify-tools
-clarify:
+clarify-common:
   install: /etc/clarify/server
   share: /etc/clarify/share
   user: ubuntu
+  nomadport: 4646

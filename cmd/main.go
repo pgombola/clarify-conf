@@ -15,7 +15,7 @@ import (
 
 type config struct {
 	Nodes   []*node
-	Clarify clarify
+	Clarify *clarify
 }
 
 type node struct {
@@ -53,20 +53,12 @@ func main() {
 	}
 	peers, _ := config.peers()
 
-	args := &args{}
-	args.user(config.Clarify.User)
-	args.toolsInstall(node.Tools)
-	args.clarifyInstall(config.Clarify.Install)
-	args.clarifyShare(config.Clarify.Share)
-	args.netInterface(node.NetInterface)
-	args.address(node.Address)
-	args.nomad(node.NomadPort)
-	args.hosts(peers)
+	fmt.Println(newArgs(config.Clarify, node, peers).Args)
 
 	cmd := &exec.Cmd{
 		Dir:  config.Clarify.Install,
 		Path: "jre/bin/java",
-		Args: args.Args,
+		Args: newArgs(config.Clarify, node, peers).Args,
 	}
 
 	if err := cmd.Run(); err != nil {
@@ -107,6 +99,19 @@ func (n *config) peers() (string, error) {
 		}
 	}
 	return strings.Join(peers, " "), nil
+}
+
+func newArgs(c *clarify, n *node, peers string) *args {
+	args := &args{}
+	args.user(c.User)
+	args.toolsInstall(n.Tools)
+	args.clarifyInstall(c.Install)
+	args.clarifyShare(c.Share)
+	args.netInterface(n.NetInterface)
+	args.address(n.Address)
+	args.nomad(n.NomadPort)
+	args.hosts(peers)
+	return args
 }
 
 func (a *args) user(user string) {

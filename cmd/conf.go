@@ -49,18 +49,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	node, err := config.findLocalNode()
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("Local node: {hostname=%s, net=%s, tools=%s}\n", node.Hostname, node.NetInterface, node.Tools)
-	peers, err := config.peers()
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("Peers: %v\n", peers)
-
-	args, err := newArgs(config.Clarify, node, peers)
+	args, err := newArgs(config)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -115,20 +104,30 @@ func (n *config) peers() (string, error) {
 	return strings.Join(peers, " "), nil
 }
 
-func newArgs(c *clarify, n *node, peers string) (*args, error) {
+func newArgs(c *config) (*args, error) {
 	args := &args{}
-	jar, err := findInstallerJar(c.Install)
+	node, err := c.findLocalNode()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Local node: {hostname=%s, net=%s, tools=%s}\n", node.Hostname, node.NetInterface, node.Tools)
+
+	peers, err := c.peers()
+	if err != nil {
+		log.Fatal(err)
+	}
+	jar, err := findInstallerJar(c.Clarify.Install)
 	if err != nil {
 		return args, err
 	}
 	args.jar(jar)
-	args.user(c.User)
-	args.toolsInstall(n.Tools)
-	args.clarifyInstall(c.Install)
-	args.clarifyShare(c.Share)
-	args.netInterface(n.NetInterface)
-	args.address(n.Address)
-	args.nomad(c.NomadPort)
+	args.user(c.Clarify.User)
+	args.toolsInstall(node.Tools)
+	args.clarifyInstall(c.Clarify.Install)
+	args.clarifyShare(c.Clarify.Share)
+	args.netInterface(node.NetInterface)
+	args.address(node.Address)
+	args.nomad(c.Clarify.NomadPort)
 	args.hosts(peers)
 	return args, nil
 }

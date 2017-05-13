@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
+	"net"
 	"os"
 	"os/exec"
 	"path"
@@ -44,32 +46,34 @@ func main() {
 
 	config, err := parse(cfg)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
 
 	node, err := config.findLocalNode()
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
-	peers, _ := config.peers()
+	fmt.Printf("Local node: {hostname=%s, net=%s, tools=%s}\n", node.Hostname, node.NetInterface, node.Tools)
+	peers, err := config.peers()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("Peers: %v\n", peers)
 
 	args, err := newArgs(config.Clarify, node, peers)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		log.Fatal(err)
 	}
-	cmd := &exec.Cmd{
-		Dir:  config.Clarify.Install,
-		Path: "jre/bin/java",
-		Args: args.Args,
+	if !strings.HasSuffix(config.Clarify.Install, string(os.PathSeparator)) {
+		config.Clarify.Install = config.Clarify.Install + string(os.PathSeparator)
 	}
 
-	fmt.Printf("Command: %s %v\n", cmd.Dir+cmd.Path, strings.Join(cmd.Args, " "))
-	if err := cmd.Run(); err != nil {
-		fmt.Println(err)
+	cmd := exec.Command(config.Clarify.Install+"jre/bin/java", args.Args...)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Printf("Command returned error:\n%v\n", err)
 	}
+	fmt.Printf("Command output:\n%v\n", string(out))
 }
 
 func parse(filename *string) (*config, error) {
@@ -78,7 +82,7 @@ func parse(filename *string) (*config, error) {
 	if err != nil {
 		return c, fmt.Errorf("unable to read %s", *filename)
 	}
-	if err := yaml.Unmarshal([]byte(data), &c); err != nil {
+	if err := yaml.Unmarshal(data, &c); err != nil {
 		return c, err
 	}
 	return c, nil
@@ -101,7 +105,11 @@ func (n *config) peers() (string, error) {
 		if hostname, err := os.Hostname(); err != nil {
 			return "", err
 		} else if n.Hostname != hostname {
-			peers = append(peers, n.Address)
+			ips, err := net.LookupIP(n.Hostname)
+			if err != nil {
+				return "", err
+			}
+			peers = append(peers, ips[0].To4().String())
 		}
 	}
 	return strings.Join(peers, " "), nil
@@ -150,8 +158,7 @@ func findInstallerJar(install string) (string, error) {
 }
 
 func (a *args) user(user string) {
-	a.Args = append(a.Args, "-user")
-	a.Args = append(a.Args, user)
+	a.Args = append(a.Args, fmt.Sprintf("-user %s", user))
 }
 
 func (a *args) toolsInstall(dir string) {
@@ -184,7 +191,7 @@ func (a *args) address(address string) {
 
 func (a *args) nomad(port int) {
 	portStr := strconv.Itoa(port)
-	a.Args = append(a.Args, "-nomad_port")
+	a.Args = append(a.Args, "-nomad.port")
 	a.Args = append(a.Args, portStr)
 }
 
@@ -196,4 +203,8 @@ func (a *args) hosts(peers string) {
 func (a *args) jar(jar string) {
 	a.Args = append(a.Args, "-jar")
 	a.Args = append(a.Args, jar)
+}
+
+func (a *args) main() {
+	a.Args = append(a.Args, "com.cleo.clarify.service.installer.Installer")
 }

@@ -58,11 +58,11 @@ func main() {
 	}
 
 	cmd := exec.Command(config.Clarify.Install+"jre/bin/java", args.Args...)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		fmt.Printf("Command returned error:\n%v\n", err)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		fmt.Printf("Error executing command: %v\n", err)
 	}
-	fmt.Printf("Command output:\n%v\n", string(out))
 }
 
 func parse(filename *string) (*config, error) {
@@ -116,6 +116,8 @@ func newArgs(c *config) (*args, error) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	fmt.Printf("Peers: %s\n", peers)
+
 	jar, err := findInstallerJar(c.Clarify.Install)
 	if err != nil {
 		return args, err
@@ -126,7 +128,9 @@ func newArgs(c *config) (*args, error) {
 	args.clarifyInstall(c.Clarify.Install)
 	args.clarifyShare(c.Clarify.Share)
 	args.netInterface(node.NetInterface)
-	args.address(node.Address)
+	if err := args.address(node.Hostname); err != nil {
+		return args, err
+	}
 	args.nomad(c.Clarify.NomadPort)
 	args.hosts(peers)
 	return args, nil
@@ -180,12 +184,14 @@ func (a *args) netInterface(net string) {
 	a.Args = append(a.Args, net)
 }
 
-func (a *args) address(address string) {
-	if len(address) == 0 {
-		return
+func (a *args) address(hostname string) error {
+	ips, err := net.LookupIP(hostname)
+	if err != nil {
+		return err
 	}
 	a.Args = append(a.Args, "-address")
-	a.Args = append(a.Args, address)
+	a.Args = append(a.Args, ips[0].To4().String())
+	return nil
 }
 
 func (a *args) nomad(port int) {

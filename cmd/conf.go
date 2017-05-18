@@ -88,20 +88,20 @@ func (n *config) findLocalNode() (*node, error) {
 	return &node{}, errors.New("node not found")
 }
 
-func (n *config) peers() (string, error) {
+func (n *config) peers() ([]string, error) {
 	var peers = make([]string, 0)
 	for _, n := range n.Nodes {
 		if hostname, err := os.Hostname(); err != nil {
-			return "", err
+			return peers, err
 		} else if n.Hostname != hostname {
 			ips, err := net.LookupIP(n.Hostname)
 			if err != nil {
-				return "", err
+				return peers, err
 			}
 			peers = append(peers, ips[0].To4().String())
 		}
 	}
-	return strings.Join(peers, " "), nil
+	return peers, nil
 }
 
 func newArgs(c *config) (*args, error) {
@@ -127,7 +127,9 @@ func newArgs(c *config) (*args, error) {
 	args.toolsInstall(node.Tools)
 	args.clarifyInstall(c.Clarify.Install)
 	args.clarifyShare(c.Clarify.Share)
-	args.netInterface(node.NetInterface)
+	if err := args.netInterface(node.NetInterface, node.Hostname); err != nil {
+		return args, err
+	}
 	if err := args.address(node.Hostname); err != nil {
 		return args, err
 	}
@@ -179,18 +181,34 @@ func (a *args) clarifyShare(dir string) {
 	a.Args = append(a.Args, dir)
 }
 
-func (a *args) netInterface(net string) {
-	a.Args = append(a.Args, "-net")
-	a.Args = append(a.Args, net)
+func (a *args) netInterface(netInt, hostname string) error {
+	i, _ := net.InterfaceByName(netInt)
+	hostIP, err := findHostIP(hostname)
+	if err != nil {
+		return err
+	}
+	addrs, err := i.Addrs()
+	if err != nil {
+		return err
+	}
+	for _, addr := range addrs {
+		netIP, _, _ := net.ParseCIDR(addr.String())
+		if netIP.To4().String() == hostIP {
+			a.Args = append(a.Args, "-net")
+			a.Args = append(a.Args, netInt)
+			return nil
+		}
+	}
+	return fmt.Errorf("network interface (%s) is not addressed by hostname (%s)", netInt, hostname)
 }
 
 func (a *args) address(hostname string) error {
-	ips, err := net.LookupIP(hostname)
+	hostIP, err := findHostIP(hostname)
 	if err != nil {
 		return err
 	}
 	a.Args = append(a.Args, "-address")
-	a.Args = append(a.Args, ips[0].To4().String())
+	a.Args = append(a.Args, hostIP)
 	return nil
 }
 
@@ -200,9 +218,11 @@ func (a *args) nomad(port int) {
 	a.Args = append(a.Args, portStr)
 }
 
-func (a *args) hosts(peers string) {
+func (a *args) hosts(peers []string) {
 	a.Args = append(a.Args, "-hosts")
-	a.Args = append(a.Args, peers)
+	for _, peer := range peers {
+		a.Args = append(a.Args, peer)
+	}
 }
 
 func (a *args) jar(jar string) {
@@ -212,4 +232,17 @@ func (a *args) jar(jar string) {
 
 func (a *args) main() {
 	a.Args = append(a.Args, "com.cleo.clarify.service.installer.Installer")
+}
+
+func findHostIP(hostname string) (string, error) {
+	ips, err := net.LookupIP(hostname)
+	if err != nil {
+		return "", err
+	}
+	for _, ip := range ips {
+		if !ip.IsLoopback() {
+			return ip.To4().String(), nil
+		}
+	}
+	return "", fmt.Errorf("unable to find non-loopback address for hostname (%s)", hostname)
 }

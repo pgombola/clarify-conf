@@ -41,7 +41,7 @@ type args struct {
 }
 
 func main() {
-	cfg := flag.String("cfg", "nodes.yaml", "Nodes configuration to read")
+	cfg := flag.String("cfg", "nodes.yml", "Nodes configuration to read")
 	flag.Parse()
 
 	config, err := parse(cfg)
@@ -69,7 +69,7 @@ func parse(filename *string) (*config, error) {
 	c := &config{}
 	data, err := ioutil.ReadFile(*filename)
 	if err != nil {
-		return c, fmt.Errorf("unable to read %s", *filename)
+		return c, err
 	}
 	if err := yaml.Unmarshal(data, &c); err != nil {
 		return c, err
@@ -163,7 +163,8 @@ func findInstallerJar(install string) (string, error) {
 }
 
 func (a *args) user(user string) {
-	a.Args = append(a.Args, fmt.Sprintf("-user %s", user))
+	a.Args = append(a.Args, "-user")
+	a.Args = append(a.Args, user)
 }
 
 func (a *args) toolsInstall(dir string) {

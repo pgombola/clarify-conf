@@ -110,7 +110,8 @@ func newArgs(c *config) (*args, error) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("Local node: {hostname=%s, net=%s, tools=%s}\n", node.Hostname, node.NetInterface, node.Tools)
+	hostIP, _ := findHostIP(node.Hostname)
+	fmt.Printf("Local node: {hostname=%s, net=%s, tools=%s, ip=%s}\n", node.Hostname, node.NetInterface, node.Tools, hostIP)
 
 	peers, err := c.peers()
 	if err != nil {

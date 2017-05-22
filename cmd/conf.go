@@ -26,7 +26,6 @@ type node struct {
 	Hostname     string
 	NetInterface string
 	Address      string
-	Tools        string
 }
 
 type clarify struct {
@@ -34,6 +33,7 @@ type clarify struct {
 	Share     string
 	User      string
 	NomadPort int
+	Tools     string
 }
 
 type args struct {
@@ -111,7 +111,7 @@ func newArgs(c *config) (*args, error) {
 		log.Fatal(err)
 	}
 	hostIP, _ := findHostIP(node.Hostname)
-	fmt.Printf("Local node: {hostname=%s, net=%s, tools=%s, ip=%s}\n", node.Hostname, node.NetInterface, node.Tools, hostIP)
+	fmt.Printf("Local node: {hostname=%s, net=%s, tools=%s, ip=%s}\n", node.Hostname, node.NetInterface, c.Clarify.Tools, hostIP)
 
 	peers, err := c.peers()
 	if err != nil {
@@ -125,7 +125,7 @@ func newArgs(c *config) (*args, error) {
 	}
 	args.jar(jar)
 	args.user(c.Clarify.User)
-	args.toolsInstall(node.Tools)
+	args.toolsInstall(c.Clarify.Tools)
 	args.clarifyInstall(c.Clarify.Install)
 	args.clarifyShare(c.Clarify.Share)
 	if err := args.netInterface(node.NetInterface, node.Hostname); err != nil {

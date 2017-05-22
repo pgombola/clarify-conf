@@ -1,15 +1,13 @@
 clarify-nodes:
   - hostname: brasilia
     netinterface: en01
-    tools: /home/clarify/clarify-tools
   - hostname: pgombola-mbp.extol.com
     netinterface: lo0
-    tools: /home/clarify/clarify-tools
   - hostname: docsrv
     netinterface: en01
-    tools: /home/clarify/clarify-tools
 clarify-common:
   install: /Users/pgombola/Desktop
   share: /etc/clarify/share
+  tools: /home/clarify/clarify-tools
   user: ubuntu
   nomadport: 4646

@@ -1,10 +1,13 @@
 clarify-nodes:
   - hostname: brasilia
+    address: 172.16.1.255
     netinterface: en01
   - hostname: pgombola-mbp.extol.com
-    netinterface: lo0
+    netinterface: en1
+    address: 172.16.4.113
   - hostname: docsrv
     netinterface: en01
+    address: 172.16.1.29
 clarify-common:
   install: /Users/pgombola/Desktop
   share: /etc/clarify/share

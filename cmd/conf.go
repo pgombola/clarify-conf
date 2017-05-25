@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v2"
@@ -29,11 +28,10 @@ type node struct {
 }
 
 type clarify struct {
-	Install   string
-	Share     string
-	User      string
-	NomadPort int
-	Tools     string
+	Install string
+	Share   string
+	User    string
+	Tools   string
 }
 
 type args struct {
@@ -94,11 +92,7 @@ func (n *config) peers() ([]string, error) {
 		if hostname, err := os.Hostname(); err != nil {
 			return peers, err
 		} else if n.Hostname != hostname {
-			ips, err := net.LookupIP(n.Hostname)
-			if err != nil {
-				return peers, err
-			}
-			peers = append(peers, ips[0].To4().String())
+			peers = append(peers, n.Address)
 		}
 	}
 	return peers, nil
@@ -110,8 +104,8 @@ func newArgs(c *config) (*args, error) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	hostIP, _ := findHostIP(node.Hostname)
-	fmt.Printf("Local node: {hostname=%s, net=%s, tools=%s, ip=%s}\n", node.Hostname, node.NetInterface, c.Clarify.Tools, hostIP)
+	fmt.Printf("Local node: {hostname=%s, net=%s, tools=%s, address=%s}\n",
+		node.Hostname, node.NetInterface, c.Clarify.Tools, node.Address)
 
 	peers, err := c.peers()
 	if err != nil {
@@ -128,13 +122,10 @@ func newArgs(c *config) (*args, error) {
 	args.toolsInstall(c.Clarify.Tools)
 	args.clarifyInstall(c.Clarify.Install)
 	args.clarifyShare(c.Clarify.Share)
-	if err := args.netInterface(node.NetInterface, node.Hostname); err != nil {
+	if err := args.netInterface(node.NetInterface, node.Address); err != nil {
 		return args, err
 	}
-	if err := args.address(node.Hostname); err != nil {
-		return args, err
-	}
-	args.nomad(c.Clarify.NomadPort)
+	args.address(node.Address)
 	args.hosts(peers)
 	return args, nil
 }
@@ -183,41 +174,26 @@ func (a *args) clarifyShare(dir string) {
 	a.Args = append(a.Args, dir)
 }
 
-func (a *args) netInterface(netInt, hostname string) error {
+func (a *args) netInterface(netInt, address string) error {
 	i, _ := net.InterfaceByName(netInt)
-	hostIP, err := findHostIP(hostname)
-	if err != nil {
-		return err
-	}
 	addrs, err := i.Addrs()
 	if err != nil {
 		return err
 	}
 	for _, addr := range addrs {
 		netIP, _, _ := net.ParseCIDR(addr.String())
-		if netIP.To4().String() == hostIP {
+		if netIP.To4().String() == address {
 			a.Args = append(a.Args, "-net")
 			a.Args = append(a.Args, netInt)
 			return nil
 		}
 	}
-	return fmt.Errorf("network interface (%s) is not addressed by hostname (%s)", netInt, hostname)
+	return fmt.Errorf("network interface (%s) is not bound to address (%s)", netInt, address)
 }
 
-func (a *args) address(hostname string) error {
-	hostIP, err := findHostIP(hostname)
-	if err != nil {
-		return err
-	}
+func (a *args) address(address string) {
 	a.Args = append(a.Args, "-address")
-	a.Args = append(a.Args, hostIP)
-	return nil
-}
-
-func (a *args) nomad(port int) {
-	portStr := strconv.Itoa(port)
-	a.Args = append(a.Args, "-nomad.port")
-	a.Args = append(a.Args, portStr)
+	a.Args = append(a.Args, address)
 }
 
 func (a *args) hosts(peers []string) {
@@ -234,17 +210,4 @@ func (a *args) jar(jar string) {
 
 func (a *args) main() {
 	a.Args = append(a.Args, "com.cleo.clarify.service.installer.Installer")
-}
-
-func findHostIP(hostname string) (string, error) {
-	ips, err := net.LookupIP(hostname)
-	if err != nil {
-		return "", err
-	}
-	for _, ip := range ips {
-		if !ip.IsLoopback() {
-			return ip.To4().String(), nil
-		}
-	}
-	return "", fmt.Errorf("unable to find non-loopback address for hostname (%s)", hostname)
 }
